@@ -182,6 +182,7 @@ func TestCreateLogs(t *testing.T) {
 		containsRequestId bool
 		requestId         string
 		severityNumber    plog.SeverityNumber
+		attributes        map[string]interface{}
 	}
 
 	testCases := []struct {
@@ -298,6 +299,66 @@ func TestCreateLogs(t *testing.T) {
 					requestId:         "79b4f56e-95b1-4643-9700-2807f4e68189",
 					severityText:      "Info",
 					severityNumber:    plog.SeverityNumberInfo,
+				},
+			},
+			expectError: false,
+		},
+		{
+			desc: "function json with extra fields",
+			slice: []event{
+				{
+					Time: "2026-02-26T20:15:32.000Z",
+					Type: "function",
+					Record: map[string]any{
+						"timestamp":             "2026-02-26T20:15:32.000Z",
+						"level":                 "INFO",
+						"requestId":             "79b4f56e-95b1-4643-9700-2807f4e6",
+						"message":               "Hello world, I am a function with extra data!",
+						"extraString":           "stringValue",
+						"extraNumber":           "2217",
+						"extraBoolean":          true,
+						"extraNull":             nil,
+						"extraArray":            []any{"stringValue", 2217, true, nil},
+						"extraArrayWithNesting": []any{"stringValue", []any{2217, []any{true, nil}}},
+						"extraObject": map[string]any{
+							"stringValue":  "stringValue",
+							"numberValue":  2217,
+							"booleanValue": true,
+							"nullValue":    nil,
+						},
+						"extraObjectWithNesting": map[string]any{
+							"stringValue":  "stringValue",
+							"numberValue":  2217,
+							"booleanValue": true,
+							"nullValue":    nil,
+							"arrayValue":   []any{"stringValue", 2217},
+							"objectValue": map[string]any{
+								"stringValue": "stringValue",
+								"numberValue": 2217,
+							},
+						},
+					},
+				},
+			},
+			expectedLogs: []logInfo{
+				{
+					logType:           "function",
+					timestamp:         "2026-02-26T20:15:32.000Z",
+					body:              "Hello world, I am a function with extra data!",
+					containsRequestId: true,
+					requestId:         "79b4f56e-95b1-4643-9700-2807f4e6",
+					severityText:      "Info",
+					severityNumber:    plog.SeverityNumberInfo,
+					attributes: map[string]interface{}{
+						"app.extra.extraString": "stringValue",
+						"app.extra.extraNumber": 2217,
+						// "app.extra.extraBoolean":           "true",
+						// "app.extra.extraNull":              "null",
+						// "app.extra.extraArray":             "[stringValue, 2217, true, null]",
+						// "app.extra.extraArrayWithNesting":  "[stringValue, [2217, [true, null]]]",
+						// "app.extra.extraObject":            "{stringValue:stringValue, numberValue:2217, booleanValue:true, nullValue:null}",
+						// "app.extra.extraObjectWithNesting": "{stringValue:stringValue, numberValue:2217, nullValue:null, arrayValue:[stringValue, 2217], objectValue:{stringValue:stringValue, numberValue:2217}}",
+					},
 				},
 			},
 			expectError: false,
@@ -643,6 +704,13 @@ func TestCreateLogs(t *testing.T) {
 				require.Equal(t, expected.severityText, logRecord.SeverityText())
 				require.Equal(t, expected.severityNumber, logRecord.SeverityNumber())
 				require.Equal(t, expected.body, logRecord.Body().Str())
+
+				// Check extra attributes
+				for key, value := range expected.attributes {
+					attr, ok := logRecord.Attributes().Get(key)
+					require.True(t, ok, "expected attribute %s not found", key)
+					require.Equal(t, value, attr.Str(), "expected attribute %s to have value %s, got %s", key, value, attr.Str())
+				}
 			}
 		})
 	}

@@ -416,6 +416,19 @@ func (r *telemetryAPIReceiver) createLogs(slice []event) (plog.Logs, error) {
 				}
 			} else if line, ok := record["message"].(string); ok {
 				logRecord.Body().SetStr(line)
+
+				for key, value := range record {
+					switch key {
+					case "level", "message", "requestId", "timestamp":
+						continue
+					default:
+						attr, _ := logRecord.Attributes().GetOrPutEmpty("app.extra." + key)
+						if err := attr.FromRaw(value); err != nil {
+							r.logger.Warn(fmt.Sprintf("error creating attribute: %s", key), zap.Error(err))
+							continue
+						}
+					}
+				}
 			}
 		} else {
 			if requestId := r.getCurrentRequestId(); requestId != "" {
